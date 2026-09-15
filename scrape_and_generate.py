@@ -2,14 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 파주 지역 뉴스 스크랩 스크립트 (GitHub Actions용)
-- 네이버 검색 API로 파주 관련 뉴스를 수집하고 Gemini로 한 줄 요약합니다.
-- 결과를 index.html(게시판 스타일 전체 페이지)로 저장합니다.
-- API 키는 환경변수(GitHub Secrets)에서 읽어옵니다.
+- 네이버 검색 API로 파주 관련 뉴스를 수집
+- 네이버 뉴스(n.news.naver.com) 링크: 댓글 수 조회 가능 → "댓글순" 탭
+- 그 외 지역 언론사 자체 링크: 댓글 수 조회 불가 → "연관도순" 탭
+- Gemini로 한 줄 요약
+- 결과를 index.html(탭 2개짜리 게시판 스타일 페이지)로 저장
 """
 
 import os
-import requests
 import re
+import json
+import requests
 from datetime import datetime, timedelta, timezone
 from html import unescape
 from bs4 import BeautifulSoup
@@ -20,14 +23,12 @@ from google import genai
 # 설정 영역
 # ============================================
 
-# API 키는 환경변수에서 읽음 (GitHub Secrets로 주입됨)
 CLIENT_ID = os.environ["NAVER_CLIENT_ID"]
 CLIENT_SECRET = os.environ["NAVER_CLIENT_SECRET"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# 검색할 키워드 목록 (파주 중심)
 KEYWORDS = [
     "파주 맛집",
     "파주 사건",
@@ -40,7 +41,8 @@ KEYWORDS = [
     "헤이리마을",
 ]
 
-NEWS_PER_KEYWORD = 5
+NEWS_PER_KEYWORD = 8      # 키워드당 넉넉히 수집 (최종 정렬 후 추릴 것)
+TOP_N = 20                # 탭별 최종 표시 개수
 LOCAL_KEYWORDS = ["파주", "야당", "헤이리", "운정", "금촌", "문산", "교하"]
 
 KST = timezone(timedelta(hours=9))
@@ -55,7 +57,7 @@ def search_news(keyword, display=10):
         "X-Naver-Client-Id": CLIENT_ID,
         "X-Naver-Client-Secret": CLIENT_SECRET
     }
-    params = {"query": keyword, "display": display, "start": 1, "sort": "date"}
+    params = {"query": keyword, "display": display, "start": 1, "sort": "sim"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
@@ -83,6 +85,32 @@ def get_full_content(url):
     except Exception:
         pass
     return ""
+
+def get_naver_ids(url):
+    """네이버 뉴스 링크면 (oid, aid)를 반환, 아니면 None"""
+    match = re.search(r'/article/(\d+)/(\d+)', url)
+    if match:
+        return match.group(1), match.group(2)
+    return None
+
+def get_comment_count(oid, aid, url):
+    try:
+        api_url = (
+            "https://apis.naver.com/commentBox/cbox/web_naver_list_jsonp.json"
+            "?ticket=news&templateId=default_society&pool=cbox5"
+            "&_callback=jQuery"
+            f"&lang=ko&country=KR&objectId=news{oid},{aid}"
+            "&categoryId=&pageSize=1&indexSize=10&groupId="
+            "&listType=OBJECT&pageType=more&page=1&sort=new"
+        )
+        headers = {"User-Agent": "Mozilla/5.0", "Referer": url}
+        res = requests.get(api_url, headers=headers, timeout=5)
+        text = res.text
+        json_str = text[text.index("(") + 1: text.rindex(")")]
+        data = json.loads(json_str)
+        return data["result"]["count"]["comment"]
+    except Exception:
+        return 0
 
 def is_local_news(title, desc):
     text = title + " " + desc
@@ -136,7 +164,7 @@ def collect_all_news():
     print("뉴스 수집 중...")
     for keyword in KEYWORDS:
         print(f"  '{keyword}' 검색 중...")
-        result = search_news(keyword, NEWS_PER_KEYWORD * 5)
+        result = search_news(keyword, NEWS_PER_KEYWORD * 3)
 
         if result and "items" in result:
             count = 0
@@ -157,11 +185,20 @@ def collect_all_news():
                 content = get_full_content(item["link"]) or api_desc
                 summary = summarize_with_gemini(api_title, content)
 
+                naver_ids = get_naver_ids(item["link"])
+                is_naver = naver_ids is not None
+                comment_count = 0
+                if is_naver:
+                    oid, aid = naver_ids
+                    comment_count = get_comment_count(oid, aid, item["link"])
+
                 all_news.append({
                     "title": api_title,
                     "link": item["link"],
                     "summary": summary,
-                    "keyword": keyword
+                    "keyword": keyword,
+                    "is_naver": is_naver,
+                    "comment_count": comment_count,
                 })
 
                 seen_links.add(item["link"])
@@ -169,18 +206,30 @@ def collect_all_news():
                 count += 1
                 time.sleep(0.3)
 
-    return all_news
+    # 네이버 뉴스(댓글 조회 가능) / 지역 언론사 자체 링크(연관도순 유지)로 분리
+    comment_group = [n for n in all_news if n["is_naver"]]
+    local_group = [n for n in all_news if not n["is_naver"]]
+
+    # 댓글순 탭: 댓글 많은 순
+    comment_group.sort(key=lambda x: x["comment_count"], reverse=True)
+
+    # 연관도순 탭: 수집된 순서(=검색 API의 연관도순, sort=sim) 그대로 유지
+
+    return comment_group[:TOP_N], local_group[:TOP_N]
 
 # ============================================
-# 게시판 스타일 전체 HTML 페이지 생성
+# 게시판 스타일 전체 HTML 페이지 생성 (탭 2개)
 # ============================================
 
-def generate_full_page(news_list):
-    now = datetime.now(KST)
-    updated_str = now.strftime("%Y-%m-%d (%a) %H:%M 업데이트")
+def render_rows(news_list, show_comment_badge):
+    if not news_list:
+        return '<div class="empty-msg">해당하는 뉴스가 없습니다.</div>'
 
     rows = ""
     for i, news in enumerate(news_list, 1):
+        badge = ""
+        if show_comment_badge:
+            badge = f'<span class="comment-badge">💬 댓글 {news["comment_count"]}개</span>'
         rows += f"""
         <div class="news-row">
             <div class="news-num">{i}</div>
@@ -189,10 +238,21 @@ def generate_full_page(news_list):
                     <a href="{news['link']}" target="_blank" rel="noopener">{news['title']}</a>
                 </div>
                 <div class="news-summary">{news['summary']}</div>
-                <div class="news-tag">#{news['keyword'].replace(' ', '')}</div>
+                <div class="news-meta">
+                    <span class="news-tag">#{news['keyword'].replace(' ', '')}</span>
+                    {badge}
+                </div>
             </div>
         </div>
         """
+    return rows
+
+def generate_full_page(comment_news, local_news):
+    now = datetime.now(KST)
+    updated_str = now.strftime("%Y-%m-%d (%a) %H:%M 업데이트")
+
+    comment_rows = render_rows(comment_news, show_comment_badge=True)
+    local_rows = render_rows(local_news, show_comment_badge=False)
 
     html = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -228,6 +288,42 @@ def generate_full_page(news_list):
     background: #fff;
     min-height: 100vh;
   }}
+  .tab-bar {{
+    display: flex;
+    border-bottom: 2px solid #eee;
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }}
+  .tab-btn {{
+    flex: 1;
+    padding: 14px 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #999;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+  }}
+  .tab-btn.active {{
+    color: #EB6248;
+    border-bottom: 3px solid #EB6248;
+  }}
+  .tab-panel {{
+    display: none;
+  }}
+  .tab-panel.active {{
+    display: block;
+  }}
+  .tab-desc {{
+    padding: 10px 20px;
+    font-size: 12px;
+    color: #999;
+    background: #fafafa;
+  }}
   .news-row {{
     display: flex;
     padding: 16px 20px;
@@ -254,14 +350,28 @@ def generate_full_page(news_list):
     margin-top: 6px;
     line-height: 1.5;
   }}
+  .news-meta {{
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }}
   .news-tag {{
     display: inline-block;
-    margin-top: 8px;
     font-size: 11px;
     color: #EB6248;
     background: #FDEDE9;
     padding: 2px 8px;
     border-radius: 10px;
+  }}
+  .comment-badge {{
+    font-size: 11px;
+    color: #888;
+  }}
+  .empty-msg {{
+    padding: 40px;
+    text-align: center;
+    color: #999;
   }}
   .footer {{
     text-align: center;
@@ -277,9 +387,33 @@ def generate_full_page(news_list):
       <h1>📰 파주 핫이슈 게시판</h1>
       <div class="updated">{updated_str}</div>
     </div>
-    {rows if news_list else '<div style="padding:40px;text-align:center;color:#999;">오늘은 수집된 뉴스가 없습니다.</div>'}
-    <div class="footer">총 {len(news_list)}건 | 매일 아침 자동 업데이트</div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('comment', this)">💬 댓글순</button>
+      <button class="tab-btn" onclick="showTab('local', this)">📍 지역뉴스 연관도순</button>
+    </div>
+
+    <div id="tab-comment" class="tab-panel active">
+      <div class="tab-desc">네이버 뉴스 댓글 많은 순 (연합뉴스·매일경제 등 대형 언론사 위주)</div>
+      {comment_rows}
+    </div>
+
+    <div id="tab-local" class="tab-panel">
+      <div class="tab-desc">지역 언론사 자체 기사 · 검색 연관도 높은 순</div>
+      {local_rows}
+    </div>
+
+    <div class="footer">댓글순 {len(comment_news)}건 · 지역뉴스 {len(local_news)}건 | 매일 아침 자동 업데이트</div>
   </div>
+
+  <script>
+    function showTab(name, btn) {{
+      document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      btn.classList.add('active');
+    }}
+  </script>
 </body>
 </html>"""
     return html
@@ -289,11 +423,11 @@ def generate_full_page(news_list):
 # ============================================
 
 def main():
-    news_list = collect_all_news()
-    html_output = generate_full_page(news_list)
+    comment_news, local_news = collect_all_news()
+    html_output = generate_full_page(comment_news, local_news)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_output)
-    print(f"\n완료: index.html 생성 ({len(news_list)}건)")
+    print(f"\n완료: index.html 생성 (댓글순 {len(comment_news)}건 / 지역뉴스 {len(local_news)}건)")
 
 if __name__ == "__main__":
     main()
