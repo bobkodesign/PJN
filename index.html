@@ -32,6 +32,42 @@
     background: #fff;
     min-height: 100vh;
   }
+  .tab-bar {
+    display: flex;
+    border-bottom: 2px solid #eee;
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 14px 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #999;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+  }
+  .tab-btn.active {
+    color: #EB6248;
+    border-bottom: 3px solid #EB6248;
+  }
+  .tab-panel {
+    display: none;
+  }
+  .tab-panel.active {
+    display: block;
+  }
+  .tab-desc {
+    padding: 10px 20px;
+    font-size: 12px;
+    color: #999;
+    background: #fafafa;
+  }
   .news-row {
     display: flex;
     padding: 16px 20px;
@@ -58,14 +94,28 @@
     margin-top: 6px;
     line-height: 1.5;
   }
+  .news-meta {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
   .news-tag {
     display: inline-block;
-    margin-top: 8px;
     font-size: 11px;
     color: #EB6248;
     background: #FDEDE9;
     padding: 2px 8px;
     border-radius: 10px;
+  }
+  .comment-badge {
+    font-size: 11px;
+    color: #888;
+  }
+  .empty-msg {
+    padding: 40px;
+    text-align: center;
+    color: #999;
   }
   .footer {
     text-align: center;
@@ -79,17 +129,28 @@
   <div class="container">
     <div class="board-header">
       <h1>📰 파주 핫이슈 게시판</h1>
-      <div class="updated">2026-09-15 (Tue) 09:23 업데이트</div>
+      <div class="updated">2026-09-15 (Tue) 09:35 업데이트</div>
     </div>
-    
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('comment', this)">💬 댓글순</button>
+      <button class="tab-btn" onclick="showTab('local', this)">📍 지역뉴스 연관도순</button>
+    </div>
+
+    <div id="tab-comment" class="tab-panel active">
+      <div class="tab-desc">네이버 뉴스 댓글 많은 순 (연합뉴스·매일경제 등 대형 언론사 위주)</div>
+      
         <div class="news-row">
             <div class="news-num">1</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.topstarnews.net/news/articleView.html?idxno=16193259" target="_blank" rel="noopener">'해피라이프' 남양주 와부읍 들기름막국수·연어비빔메밀 맛집 위치는?...</a>
+                    <a href="https://n.news.naver.com/mnews/article/308/0000038756?sid=100" target="_blank" rel="noopener">‘강한 야당’ 만들겠다던 장동혁, 지지율 20%의 역설</a>
                 </div>
-                <div class="news-summary">'해피라이프' 남양주 와부읍 들기름막국수·연어비빔메밀 맛집 위치는?...</div>
-                <div class="news-tag">#파주맛집</div>
+                <div class="news-summary">‘강한 야당’ 만들겠다던 장동혁, 지지율 20%의 역설</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    <span class="comment-badge">💬 댓글 237개</span>
+                </div>
             </div>
         </div>
         
@@ -97,10 +158,13 @@
             <div class="news-num">2</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.econovill.com/news/articleView.html?idxno=750632" target="_blank" rel="noopener">1241회 로또 고액 판매점 주소 정리…·1등 13곳·2등 83곳·인터넷 1등 ...</a>
+                    <a href="https://n.news.naver.com/mnews/article/437/0000511043?sid=100" target="_blank" rel="noopener">김승원 '국힘 정당해산 검토' 입장 내놓자 "제1야당을?"</a>
                 </div>
-                <div class="news-summary">1241회 로또 고액 판매점 주소 정리…·1등 13곳·2등 83곳·인터넷 1등 ...</div>
-                <div class="news-tag">#파주맛집</div>
+                <div class="news-summary">김승원 '국힘 정당해산 검토' 입장 내놓자 "제1야당을?"</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    <span class="comment-badge">💬 댓글 179개</span>
+                </div>
             </div>
         </div>
         
@@ -108,10 +172,13 @@
             <div class="news-num">3</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.kukinews.com/article/view/kuk202609110052" target="_blank" rel="noopener">아이파크몰, ‘낚시’ 취향 공략 外 BGF리테일‧신세계사이먼‧11번가 ...</a>
+                    <a href="https://n.news.naver.com/mnews/article/666/0000123378?sid=110" target="_blank" rel="noopener">[사설] 한동훈 빠진 김승원 청문회, 야당에도 후유증 올 것</a>
                 </div>
-                <div class="news-summary">아이파크몰, ‘낚시’ 취향 공략 外 BGF리테일‧신세계사이먼‧11번가 ...</div>
-                <div class="news-tag">#파주맛집</div>
+                <div class="news-summary">[사설] 한동훈 빠진 김승원 청문회, 야당에도 후유증 올 것</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    <span class="comment-badge">💬 댓글 159개</span>
+                </div>
             </div>
         </div>
         
@@ -119,10 +186,13 @@
             <div class="news-num">4</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.taxtimes.co.kr/news/article.html?no=276819" target="_blank" rel="noopener">인천국세청, K-SUUL 대표주 15종 선정 "지역 우수 주류 세계화 지원"</a>
+                    <a href="https://n.news.naver.com/mnews/article/009/0005734438?sid=100" target="_blank" rel="noopener">‘올공 100일’ 북치는 장동혁…김종혁 “혼이 나갔나, 아주 살판났다”...</a>
                 </div>
-                <div class="news-summary">인천국세청, K-SUUL 대표주 15종 선정 "지역 우수 주류 세계화 지원"</div>
-                <div class="news-tag">#파주맛집</div>
+                <div class="news-summary">‘올공 100일’ 북치는 장동혁…김종혁 “혼이 나갔나, 아주 살판났다”...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    <span class="comment-badge">💬 댓글 135개</span>
+                </div>
             </div>
         </div>
         
@@ -130,10 +200,13 @@
             <div class="news-num">5</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.4th.kr/news/articleView.html?idxno=2117875" target="_blank" rel="noopener">지역 맛집부터 뷔페까지..파주 아울렛, F&B 콘텐츠 확대</a>
+                    <a href="https://n.news.naver.com/mnews/article/021/0002818674?sid=100" target="_blank" rel="noopener">‘북치는 야당대표라니 나라꼴이’…與 박지원 의원이 꼽은 ‘야당 3인...</a>
                 </div>
-                <div class="news-summary">지역 맛집부터 뷔페까지..파주 아울렛, F&B 콘텐츠 확대</div>
-                <div class="news-tag">#파주맛집</div>
+                <div class="news-summary">‘북치는 야당대표라니 나라꼴이’…與 박지원 의원이 꼽은 ‘야당 3인...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    <span class="comment-badge">💬 댓글 109개</span>
+                </div>
             </div>
         </div>
         
@@ -141,10 +214,13 @@
             <div class="news-num">6</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/057/0001969003?sid=102" target="_blank" rel="noopener">"여성 데려와라"…경찰. 피해자 유인한 '계획범죄'</a>
+                    <a href="https://n.news.naver.com/mnews/article/079/0004120209?sid=100" target="_blank" rel="noopener">김근식 "'여섯 채' 장동혁, 승부사 이재명 대통령에 되치기 당했다"[정치...</a>
                 </div>
-                <div class="news-summary">"여성 데려와라"…경찰. 피해자 유인한 '계획범죄'</div>
-                <div class="news-tag">#파주사건</div>
+                <div class="news-summary">김근식 "'여섯 채' 장동혁, 승부사 이재명 대통령에 되치기 당했다"[정치...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당맛집</span>
+                    <span class="comment-badge">💬 댓글 69개</span>
+                </div>
             </div>
         </div>
         
@@ -152,10 +228,13 @@
             <div class="news-num">7</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/055/0001388292?sid=102" target="_blank" rel="noopener">"여성이 와 주면 좋겠다"…치밀한 범행 계획</a>
+                    <a href="https://n.news.naver.com/mnews/article/003/0014186569?sid=100" target="_blank" rel="noopener">與 법사위원 "한동훈 검찰, 김승원 수사와 당시 야당 대표 李 엮으려 해...</a>
                 </div>
-                <div class="news-summary">"여성이 와 주면 좋겠다"…치밀한 범행 계획</div>
-                <div class="news-tag">#파주사건</div>
+                <div class="news-summary">與 법사위원 "한동훈 검찰, 김승원 수사와 당시 야당 대표 李 엮으려 해...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    <span class="comment-badge">💬 댓글 49개</span>
+                </div>
             </div>
         </div>
         
@@ -163,10 +242,13 @@
             <div class="news-num">8</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/214/0001523957?sid=102" target="_blank" rel="noopener">상품권 판다며 '냉동창고'로‥"여자가 감정해야"</a>
+                    <a href="https://n.news.naver.com/mnews/article/215/0001265355?sid=102" target="_blank" rel="noopener">"여기 갔었다, 소름"…냉동창고 시신 카페 충격 후기 '속출'</a>
                 </div>
-                <div class="news-summary">상품권 판다며 '냉동창고'로‥"여자가 감정해야"</div>
-                <div class="news-tag">#파주사건</div>
+                <div class="news-summary">"여기 갔었다, 소름"…냉동창고 시신 카페 충격 후기 '속출'</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    <span class="comment-badge">💬 댓글 20개</span>
+                </div>
             </div>
         </div>
         
@@ -174,10 +256,13 @@
             <div class="news-num">9</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/056/0012257272?sid=102" target="_blank" rel="noopener">‘감금 목적’ 냉동창고 준비…“여성은 모르고 들어갔다 갇혀”</a>
+                    <a href="https://n.news.naver.com/mnews/article/005/0001872762?sid=102" target="_blank" rel="noopener">‘파주 카페 살인’은 계획 범행…공범은 없었다</a>
                 </div>
-                <div class="news-summary">‘감금 목적’ 냉동창고 준비…“여성은 모르고 들어갔다 갇혀”</div>
-                <div class="news-tag">#파주사건</div>
+                <div class="news-summary">‘파주 카페 살인’은 계획 범행…공범은 없었다</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주사건</span>
+                    <span class="comment-badge">💬 댓글 14개</span>
+                </div>
             </div>
         </div>
         
@@ -185,10 +270,13 @@
             <div class="news-num">10</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://realty.chosun.com/site/data/html_dir/2026/09/14/2026091401558.html" target="_blank" rel="noopener">파주 운정 오피스텔 8천만원대…'HUG 말소확약' 오피스텔 경매 5선</a>
+                    <a href="https://n.news.naver.com/mnews/article/001/0016303419?sid=102" target="_blank" rel="noopener">파주 아파트서 탈북 여성 시신 발견…용의자는 해외 출국</a>
                 </div>
-                <div class="news-summary">파주 운정 오피스텔 8천만원대…'HUG 말소확약' 오피스텔 경매 5선</div>
-                <div class="news-tag">#파주사건</div>
+                <div class="news-summary">파주 아파트서 탈북 여성 시신 발견…용의자는 해외 출국</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주아파트</span>
+                    <span class="comment-badge">💬 댓글 13개</span>
+                </div>
             </div>
         </div>
         
@@ -196,10 +284,13 @@
             <div class="news-num">11</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/021/0002818767?sid=102" target="_blank" rel="noopener">파주시, ‘제5회 청년희망축제’ 이달 19일 개최</a>
+                    <a href="https://n.news.naver.com/mnews/article/032/0003470412?sid=102" target="_blank" rel="noopener">[르포]다시 경매에 오른 ‘별그대 명소’ 파주 프로방스 마을 …“방문...</a>
                 </div>
-                <div class="news-summary">파주시, ‘제5회 청년희망축제’ 이달 19일 개최</div>
-                <div class="news-tag">#파주축제</div>
+                <div class="news-summary">[르포]다시 경매에 오른 ‘별그대 명소’ 파주 프로방스 마을 …“방문...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#헤이리마을</span>
+                    <span class="comment-badge">💬 댓글 9개</span>
+                </div>
             </div>
         </div>
         
@@ -207,10 +298,13 @@
             <div class="news-num">12</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.lecturernews.com/news/articleView.html?idxno=210595" target="_blank" rel="noopener">조선왕릉에서 만나는 역사와 문화…왕릉뮤지컬·야간 투어·제향 체험 ...</a>
+                    <a href="https://n.news.naver.com/mnews/article/001/0016307065?sid=103" target="_blank" rel="noopener">초가을 날씨에 축제장·관광지 북적…추석 앞두고 이른 성묘도</a>
                 </div>
-                <div class="news-summary">조선왕릉에서 만나는 역사와 문화…왕릉뮤지컬·야간 투어·제향 체험 ...</div>
-                <div class="news-tag">#파주축제</div>
+                <div class="news-summary">초가을 날씨에 축제장·관광지 북적…추석 앞두고 이른 성묘도</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주축제</span>
+                    <span class="comment-badge">💬 댓글 4개</span>
+                </div>
             </div>
         </div>
         
@@ -218,10 +312,13 @@
             <div class="news-num">13</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.ekn.kr/web/view.php?key=20260915028174661" target="_blank" rel="noopener">[패트롤] 고양시-김포시-남양주시-양주시-파주시</a>
+                    <a href="https://n.news.naver.com/mnews/article/023/0003998454?sid=102" target="_blank" rel="noopener">경찰 “파주 카페주인, 감금용으로 냉동창고 계획적 설치”</a>
                 </div>
-                <div class="news-summary">[패트롤] 고양시-김포시-남양주시-양주시-파주시</div>
-                <div class="news-tag">#파주축제</div>
+                <div class="news-summary">경찰 “파주 카페주인, 감금용으로 냉동창고 계획적 설치”</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주사건</span>
+                    <span class="comment-badge">💬 댓글 3개</span>
+                </div>
             </div>
         </div>
         
@@ -229,10 +326,13 @@
             <div class="news-num">14</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/081/0003680208?sid=103" target="_blank" rel="noopener">뮤지컬로, 달밤 답사로 느끼는 세계유산 조선왕릉</a>
+                    <a href="https://n.news.naver.com/mnews/article/003/0014188461?sid=102" target="_blank" rel="noopener">'파주 냉동창고서 60대 여성 살해' 30대 남성 구속 송치</a>
                 </div>
-                <div class="news-summary">뮤지컬로, 달밤 답사로 느끼는 세계유산 조선왕릉</div>
-                <div class="news-tag">#파주축제</div>
+                <div class="news-summary">'파주 냉동창고서 60대 여성 살해' 30대 남성 구속 송치</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주사건</span>
+                    <span class="comment-badge">💬 댓글 2개</span>
+                </div>
             </div>
         </div>
         
@@ -240,10 +340,13 @@
             <div class="news-num">15</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://hbnpress.com/news/view/1065600113457141" target="_blank" rel="noopener">경기도·경기관광공사, 여주 강천섬서 자연 속 가을 체류형 ‘느림랜드...</a>
+                    <a href="https://n.news.naver.com/mnews/article/666/0000123332?sid=102" target="_blank" rel="noopener">“위조 상품권 거래 목적”…파주 냉동창고 살해 사건 피의자, 검찰 송...</a>
                 </div>
-                <div class="news-summary">경기도·경기관광공사, 여주 강천섬서 자연 속 가을 체류형 ‘느림랜드...</div>
-                <div class="news-tag">#파주축제</div>
+                <div class="news-summary">“위조 상품권 거래 목적”…파주 냉동창고 살해 사건 피의자, 검찰 송...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주사건</span>
+                    <span class="comment-badge">💬 댓글 1개</span>
+                </div>
             </div>
         </div>
         
@@ -251,10 +354,13 @@
             <div class="news-num">16</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/215/0001265355?sid=102" target="_blank" rel="noopener">"여기 갔었다, 소름"…냉동창고 시신 카페 충격 후기 '속출'</a>
+                    <a href="https://n.news.naver.com/mnews/article/662/0000027980?sid=103" target="_blank" rel="noopener">경기 파주 핫플은? 마장호수 출렁다리 걸어보고 구수한 장단콩 아이스크...</a>
                 </div>
-                <div class="news-summary">"여기 갔었다, 소름"…냉동창고 시신 카페 충격 후기 '속출'</div>
-                <div class="news-tag">#파주핫플</div>
+                <div class="news-summary">경기 파주 핫플은? 마장호수 출렁다리 걸어보고 구수한 장단콩 아이스크...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    <span class="comment-badge">💬 댓글 1개</span>
+                </div>
             </div>
         </div>
         
@@ -262,10 +368,13 @@
             <div class="news-num">17</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.enewstoday.co.kr/news/articleView.html?idxno=2466363" target="_blank" rel="noopener">[안병익의 식신 맛집] 인생 짬뽕을 만나다! 불향 가득한 짬뽕 맛집 신흥...</a>
+                    <a href="https://n.news.naver.com/mnews/article/003/0014183721?sid=101" target="_blank" rel="noopener">"가족식사 여기서" 파주 프리미엄 아울렛 '애슐리퀸즈' 문 연다</a>
                 </div>
-                <div class="news-summary">[안병익의 식신 맛집] 인생 짬뽕을 만나다! 불향 가득한 짬뽕 맛집 신흥...</div>
-                <div class="news-tag">#파주핫플</div>
+                <div class="news-summary">"가족식사 여기서" 파주 프리미엄 아울렛 '애슐리퀸즈' 문 연다</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    <span class="comment-badge">💬 댓글 0개</span>
+                </div>
             </div>
         </div>
         
@@ -273,10 +382,13 @@
             <div class="news-num">18</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.kwangju.co.kr/article.php?aid=1787139900802466361" target="_blank" rel="noopener">[팔도 핫플] 분단 최전선에서 누리는 ‘쉼’ 평화·예술·미식의 오케스...</a>
+                    <a href="https://m.entertain.naver.com/article/609/0001166267" target="_blank" rel="noopener">린, 맛집만 잘 아는 줄 알았더니…‘미우새’서 깍두기 담그기 도전</a>
                 </div>
-                <div class="news-summary">[팔도 핫플] 분단 최전선에서 누리는 ‘쉼’ 평화·예술·미식의 오케스...</div>
-                <div class="news-tag">#파주핫플</div>
+                <div class="news-summary">린, 맛집만 잘 아는 줄 알았더니…‘미우새’서 깍두기 담그기 도전</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    <span class="comment-badge">💬 댓글 0개</span>
+                </div>
             </div>
         </div>
         
@@ -284,10 +396,13 @@
             <div class="news-num">19</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/082/0001391205?sid=110" target="_blank" rel="noopener">차박·캠핑, 단속과 관광의 차이 [논설위원의 뉴스 요리]</a>
+                    <a href="https://n.news.naver.com/mnews/article/382/0001288650?sid=103" target="_blank" rel="noopener">경기관광공사 ‘숲픽’, QR 찍으면 지역 맛집이 휴양림으로</a>
                 </div>
-                <div class="news-summary">차박·캠핑, 단속과 관광의 차이 [논설위원의 뉴스 요리]</div>
-                <div class="news-tag">#파주핫플</div>
+                <div class="news-summary">경기관광공사 ‘숲픽’, QR 찍으면 지역 맛집이 휴양림으로</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    <span class="comment-badge">💬 댓글 0개</span>
+                </div>
             </div>
         </div>
         
@@ -295,289 +410,313 @@
             <div class="news-num">20</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.kjdaily.com/article.php?aid=1784709015682869227" target="_blank" rel="noopener">'오늘N' 보양 어죽 맛본다</a>
+                    <a href="https://n.news.naver.com/mnews/article/448/0000639259?sid=102" target="_blank" rel="noopener">[티조Q&A] "당황해서 문 닫았다?"…'파주 냉동창고 살인' 8가지 전말</a>
                 </div>
-                <div class="news-summary">'오늘N' 보양 어죽 맛본다</div>
-                <div class="news-tag">#파주핫플</div>
+                <div class="news-summary">[티조Q&A] "당황해서 문 닫았다?"…'파주 냉동창고 살인' 8가지 전말</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주사건</span>
+                    <span class="comment-badge">💬 댓글 0개</span>
+                </div>
             </div>
         </div>
         
+    </div>
+
+    <div id="tab-local" class="tab-panel">
+      <div class="tab-desc">지역 언론사 자체 기사 · 검색 연관도 높은 순</div>
+      
         <div class="news-row">
-            <div class="news-num">21</div>
+            <div class="news-num">1</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.hapt.co.kr/news/articleView.html?idxno=169499" target="_blank" rel="noopener">"공동주택 관리 위반 급증" 지적에 현장 "과도한 해석" 반발</a>
+                    <a href="https://www.topstarnews.net/news/articleView.html?idxno=16193258" target="_blank" rel="noopener">'해피라이프' 파주 탄현면 해물칼국수 맛집 위치는? "바다 통째로 듬뿍...</a>
                 </div>
-                <div class="news-summary">"공동주택 관리 위반 급증" 지적에 현장 "과도한 해석" 반발</div>
-                <div class="news-tag">#파주아파트</div>
+                <div class="news-summary">'해피라이프' 파주 탄현면 해물칼국수 맛집 위치는? "바다 통째로 듬뿍...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">22</div>
+            <div class="news-num">2</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/018/0006369315?sid=102" target="_blank" rel="noopener">[미리보는 이데일리 신문] AI·현장 둘 다 능숙한 네오블루칼라 키워야</a>
+                    <a href="http://www.4th.kr/news/articleView.html?idxno=2117875" target="_blank" rel="noopener">지역 맛집부터 뷔페까지..파주 아울렛, F&B 콘텐츠 확대</a>
                 </div>
-                <div class="news-summary">[미리보는 이데일리 신문] AI·현장 둘 다 능숙한 네오블루칼라 키워야</div>
-                <div class="news-tag">#파주아파트</div>
+                <div class="news-summary">지역 맛집부터 뷔페까지..파주 아울렛, F&B 콘텐츠 확대</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">23</div>
+            <div class="news-num">3</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.100ssd.co.kr/news/articleView.html?idxno=212772" target="_blank" rel="noopener">보건복지부ㆍ한국노인인력개발원, '제20회 전국 노인자원봉사 대축제' ...</a>
+                    <a href="https://www.bntnews.co.kr/article/view/bnt202609080221" target="_blank" rel="noopener">'오늘N' 시흥 추어탕 맛집</a>
                 </div>
-                <div class="news-summary">보건복지부ㆍ한국노인인력개발원, '제20회 전국 노인자원봉사 대축제' ...</div>
-                <div class="news-tag">#파주아파트</div>
+                <div class="news-summary">'오늘N' 시흥 추어탕 맛집</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">24</div>
+            <div class="news-num">4</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/050/0000110841?sid=101" target="_blank" rel="noopener">제일건설㈜ 인천 검단·파주 운정·첨단3지구 제일풍경채 10월 입주 예정</a>
+                    <a href="https://www.bntnews.co.kr/article/view/bnt202608310297" target="_blank" rel="noopener">'남겨서 뭐하게' 된장전골·보석함 스테이크 맛집</a>
                 </div>
-                <div class="news-summary">제일건설㈜ 인천 검단·파주 운정·첨단3지구 제일풍경채 10월 입주 예정</div>
-                <div class="news-tag">#파주아파트</div>
+                <div class="news-summary">'남겨서 뭐하게' 된장전골·보석함 스테이크 맛집</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">25</div>
+            <div class="news-num">5</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/422/0000905915?sid=102" target="_blank" rel="noopener">[이시각헤드라인] 9월 14일 뉴스센터</a>
+                    <a href="http://www.enewstoday.co.kr/news/articleView.html?idxno=2466363" target="_blank" rel="noopener">[안병익의 식신 맛집] 인생 짬뽕을 만나다! 불향 가득한 짬뽕 맛집 신흥...</a>
                 </div>
-                <div class="news-summary">[이시각헤드라인] 9월 14일 뉴스센터</div>
-                <div class="news-tag">#파주아파트</div>
+                <div class="news-summary">[안병익의 식신 맛집] 인생 짬뽕을 만나다! 불향 가득한 짬뽕 맛집 신흥...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주맛집</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">26</div>
+            <div class="news-num">6</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.newsworker.co.kr/news/articleView.html?idxno=504293" target="_blank" rel="noopener">"동물실험 사망·토혈" 제넨셀 코로나약, 한국인 투약 93명 추정…오늘...</a>
+                    <a href="https://www.ekn.kr/web/view.php?key=20260915028174661" target="_blank" rel="noopener">[패트롤] 고양시-김포시-남양주시-양주시-파주시</a>
                 </div>
-                <div class="news-summary">"동물실험 사망·토혈" 제넨셀 코로나약, 한국인 투약 93명 추정…오늘...</div>
-                <div class="news-tag">#야당</div>
+                <div class="news-summary">[패트롤] 고양시-김포시-남양주시-양주시-파주시</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주축제</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">27</div>
+            <div class="news-num">7</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.chungnamilbo.co.kr/news/articleView.html?idxno=909615" target="_blank" rel="noopener">[사설]'위성정당' 총선 전에 관련 선거법을 손질하라</a>
+                    <a href="https://www.joongboo.com/news/articleView.html?idxno=363736546" target="_blank" rel="noopener">2026 파주 율곡 희망빛축제, 지역경제 살리는 문화예술축제 UP</a>
                 </div>
-                <div class="news-summary">[사설]'위성정당' 총선 전에 관련 선거법을 손질하라</div>
-                <div class="news-tag">#야당</div>
+                <div class="news-summary">2026 파주 율곡 희망빛축제, 지역경제 살리는 문화예술축제 UP</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주축제</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">28</div>
+            <div class="news-num">8</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://biz.newdaily.co.kr/site/data/html/2026/09/15/2026091500059.html" target="_blank" rel="noopener">한성숙 이어 이소영도 … 중기부 장관 후보자 ‘증여세 누락' 청문회서...</a>
+                    <a href="https://www.newsclaim.co.kr/news/articleView.html?idxno=3075249" target="_blank" rel="noopener">금촌거리문화축제 19일 개막… 전통시장·상권 활력</a>
                 </div>
-                <div class="news-summary">한성숙 이어 이소영도 … 중기부 장관 후보자 ‘증여세 누락' 청문회서...</div>
-                <div class="news-tag">#야당</div>
+                <div class="news-summary">금촌거리문화축제 19일 개막… 전통시장·상권 활력</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주축제</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">29</div>
+            <div class="news-num">9</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/127/0000039775?sid=102" target="_blank" rel="noopener">KBS·MBC '올림픽·월드컵 중계 의무화' 법안, 본회의만 남겨둬</a>
+                    <a href="https://enter.etoday.co.kr/news/view/289457" target="_blank" rel="noopener">'식스센스2' 파주 가짜 핫플 찾기…추어탕 파스타·장어 코스 요리·피자...</a>
                 </div>
-                <div class="news-summary">KBS·MBC '올림픽·월드컵 중계 의무화' 법안, 본회의만 남겨둬</div>
-                <div class="news-tag">#야당</div>
+                <div class="news-summary">'식스센스2' 파주 가짜 핫플 찾기…추어탕 파스타·장어 코스 요리·피자...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">30</div>
+            <div class="news-num">10</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.fntoday.co.kr/news/articleView.html?idxno=393042" target="_blank" rel="noopener">[조우석 칼럼] 이재명-민주당, 동반 몰락 코앞?</a>
+                    <a href="http://www.kwangju.co.kr/article.php?aid=1787139900802466361" target="_blank" rel="noopener">[팔도 핫플] 분단 최전선에서 누리는 ‘쉼’ 평화·예술·미식의 오케스...</a>
                 </div>
-                <div class="news-summary">[조우석 칼럼] 이재명-민주당, 동반 몰락 코앞?</div>
-                <div class="news-tag">#야당</div>
+                <div class="news-summary">[팔도 핫플] 분단 최전선에서 누리는 ‘쉼’ 평화·예술·미식의 오케스...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">31</div>
+            <div class="news-num">11</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.ikoreanspirit.com/news/articleView.html?idxno=87261" target="_blank" rel="noopener">연간 환자 200만 명 육박하는 허리디스크, 비수술치료의 활용도 높아</a>
+                    <a href="https://www.gukjenews.com/news/articleView.html?idxno=3454518" target="_blank" rel="noopener">'식스센스 시티투어2' 경기 파주 핫플방문...가짜는?</a>
                 </div>
-                <div class="news-summary">연간 환자 200만 명 육박하는 허리디스크, 비수술치료의 활용도 높아</div>
-                <div class="news-tag">#야당역</div>
+                <div class="news-summary">'식스센스 시티투어2' 경기 파주 핫플방문...가짜는?</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">32</div>
+            <div class="news-num">12</div>
+            <div class="news-body">
+                <div class="news-title">
+                    <a href="https://www.tournews21.com/news/articleView.html?idxno=93986" target="_blank" rel="noopener">파주 카페 투어, 어디부터 가볼까? 분위기 좋은 핫플 추천!</a>
+                </div>
+                <div class="news-summary">파주 카페 투어, 어디부터 가볼까? 분위기 좋은 핫플 추천!</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    
+                </div>
+            </div>
+        </div>
+        
+        <div class="news-row">
+            <div class="news-num">13</div>
+            <div class="news-body">
+                <div class="news-title">
+                    <a href="http://www.celuvmedia.com/article.php?aid=1724846400483881006" target="_blank" rel="noopener">‘이유 있는 건축’ 헤이리마을→핫플 카페까지, 경기도 파주行</a>
+                </div>
+                <div class="news-summary">‘이유 있는 건축’ 헤이리마을→핫플 카페까지, 경기도 파주行</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    
+                </div>
+            </div>
+        </div>
+        
+        <div class="news-row">
+            <div class="news-num">14</div>
+            <div class="news-body">
+                <div class="news-title">
+                    <a href="http://www.harpersbazaar.co.kr/article/58458" target="_blank" rel="noopener">당일치기 드라이브 코스로 딱 좋은 #파주핫플</a>
+                </div>
+                <div class="news-summary">당일치기 드라이브 코스로 딱 좋은 #파주핫플</div>
+                <div class="news-meta">
+                    <span class="news-tag">#파주핫플</span>
+                    
+                </div>
+            </div>
+        </div>
+        
+        <div class="news-row">
+            <div class="news-num">15</div>
+            <div class="news-body">
+                <div class="news-title">
+                    <a href="https://www.the-today.com/news/articleView.html?idxno=90125" target="_blank" rel="noopener">스웨덴 야당 중도좌파 연합, 총선서 과반 의석 확보 예상</a>
+                </div>
+                <div class="news-summary">스웨덴 야당 중도좌파 연합, 총선서 과반 의석 확보 예상</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당</span>
+                    
+                </div>
+            </div>
+        </div>
+        
+        <div class="news-row">
+            <div class="news-num">16</div>
             <div class="news-body">
                 <div class="news-title">
                     <a href="https://www.incheonilbo.com/news/articleView.html?idxno=1331470" target="_blank" rel="noopener">파주시, GTX-A 연계 자율주행버스 11월 시범운행 개시</a>
                 </div>
                 <div class="news-summary">파주시, GTX-A 연계 자율주행버스 11월 시범운행 개시</div>
-                <div class="news-tag">#야당역</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당역</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">33</div>
+            <div class="news-num">17</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="http://www.mygoyang.com/news/articleView.html?idxno=90227" target="_blank" rel="noopener">갈등과 폭력으로 물든 세계…침묵하지 않는 다큐의 힘</a>
+                    <a href="http://www.weeklytoday.com/news/articleView.html?idxno=791672" target="_blank" rel="noopener">[위클리오늘] 파주시, '접경지역 농민의 미래' 국회토론회 개최</a>
                 </div>
-                <div class="news-summary">갈등과 폭력으로 물든 세계…침묵하지 않는 다큐의 힘</div>
-                <div class="news-tag">#야당역</div>
+                <div class="news-summary">[위클리오늘] 파주시, '접경지역 농민의 미래' 국회토론회 개최</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당역</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">34</div>
+            <div class="news-num">18</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://www.ajunews.com/view/20260831115522497" target="_blank" rel="noopener">손배찬 시장의 파주는 '현장'에서 움직인다...민원부터 재난까지 '현문...</a>
+                    <a href="http://www.breaknews.com/1213774" target="_blank" rel="noopener">손배찬 파주시장 당선인, 당선 후 첫 행보는 야당역서 시민들에게 감사...</a>
                 </div>
-                <div class="news-summary">손배찬 시장의 파주는 '현장'에서 움직인다...민원부터 재난까지 '현문...</div>
-                <div class="news-tag">#야당역</div>
+                <div class="news-summary">손배찬 파주시장 당선인, 당선 후 첫 행보는 야당역서 시민들에게 감사...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당역</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">35</div>
+            <div class="news-num">19</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/003/0014149618?sid=102" target="_blank" rel="noopener">파주시, 시청 주변 등 10개소 반복 보행신호 적용</a>
+                    <a href="http://www.ikoreanspirit.com/news/articleView.html?idxno=87261" target="_blank" rel="noopener">연간 환자 200만 명 육박하는 허리디스크, 비수술치료의 활용도 높아</a>
                 </div>
-                <div class="news-summary">파주시, 시청 주변 등 10개소 반복 보행신호 적용</div>
-                <div class="news-tag">#야당역</div>
+                <div class="news-summary">연간 환자 200만 명 육박하는 허리디스크, 비수술치료의 활용도 높아</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당역</span>
+                    
+                </div>
             </div>
         </div>
         
         <div class="news-row">
-            <div class="news-num">36</div>
+            <div class="news-num">20</div>
             <div class="news-body">
                 <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/056/0012255504?sid=100" target="_blank" rel="noopener">[전격시사] 용혜인 작심 기자회견, 청문회는? (김기흥) “이대로 가면 ...</a>
+                    <a href="http://www.kihoilbo.co.kr/news/articleView.html?idxno=1131770" target="_blank" rel="noopener">파주시, 야당역 인근 '여성 안심귀가 스카우트' 운영…평일 밤 동행 서...</a>
                 </div>
-                <div class="news-summary">[전격시사] 용혜인 작심 기자회견, 청문회는? (김기흥) “이대로 가면 ...</div>
-                <div class="news-tag">#야당맛집</div>
+                <div class="news-summary">파주시, 야당역 인근 '여성 안심귀가 스카우트' 운영…평일 밤 동행 서...</div>
+                <div class="news-meta">
+                    <span class="news-tag">#야당역</span>
+                    
+                </div>
             </div>
         </div>
         
-        <div class="news-row">
-            <div class="news-num">37</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/052/0002403927?sid=100" target="_blank" rel="noopener">김재연 "李, 위험 부담 안고 용혜인 파격 인선...靑 사전 검토 없었나, ...</a>
-                </div>
-                <div class="news-summary">김재연 "李, 위험 부담 안고 용혜인 파격 인선...靑 사전 검토 없었나, ...</div>
-                <div class="news-tag">#야당맛집</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">38</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/660/0000114375?sid=100" target="_blank" rel="noopener">'‘영교 형' 서영교 “78년 오욕 검찰, 역사 뒤안길로...엄청난 일, 검사...</a>
-                </div>
-                <div class="news-summary">'‘영교 형' 서영교 “78년 오욕 검찰, 역사 뒤안길로...엄청난 일, 검사...</div>
-                <div class="news-tag">#야당맛집</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">39</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/469/0000944288?sid=103" target="_blank" rel="noopener">"영화 보려고 임신도 미뤘어요"… 놀런 신작 '오디세이' 원정 떠나는 사...</a>
-                </div>
-                <div class="news-summary">"영화 보려고 임신도 미뤘어요"… 놀런 신작 '오디세이' 원정 떠나는 사...</div>
-                <div class="news-tag">#야당맛집</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">40</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/469/0000941652?sid=103" target="_blank" rel="noopener">"제안만 들어오면 다 한다"... 오정세 출연작이 '지나치게' 많은 이유는</a>
-                </div>
-                <div class="news-summary">"제안만 들어오면 다 한다"... 오정세 출연작이 '지나치게' 많은 이유는</div>
-                <div class="news-tag">#야당맛집</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">41</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://n.news.naver.com/mnews/article/032/0003470412?sid=102" target="_blank" rel="noopener">[르포]다시 경매에 오른 ‘별그대 명소’ 파주 프로방스 마을 …“방문...</a>
-                </div>
-                <div class="news-summary">[르포]다시 경매에 오른 ‘별그대 명소’ 파주 프로방스 마을 …“방문...</div>
-                <div class="news-tag">#헤이리마을</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">42</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://www.topstarnews.net/news/articleView.html?idxno=16182458" target="_blank" rel="noopener">역사와 자연이 숨 쉬는 파주, 가볼 만한 곳들</a>
-                </div>
-                <div class="news-summary">역사와 자연이 숨 쉬는 파주, 가볼 만한 곳들</div>
-                <div class="news-tag">#헤이리마을</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">43</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://www.fntoday.co.kr/news/articleView.html?idxno=392830" target="_blank" rel="noopener">파주 헤이리 금속공예가 김지영, 서울시 유리지공예상 결선 진출</a>
-                </div>
-                <div class="news-summary">파주 헤이리 금속공예가 김지영, 서울시 유리지공예상 결선 진출</div>
-                <div class="news-tag">#헤이리마을</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">44</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://www.tournews21.com/news/articleView.html?idxno=143310" target="_blank" rel="noopener">누구나 즐기는 관광도시 파주…'무장애 관광'으로 여행의 문턱 낮춘다</a>
-                </div>
-                <div class="news-summary">누구나 즐기는 관광도시 파주…'무장애 관광'으로 여행의 문턱 낮춘다</div>
-                <div class="news-tag">#헤이리마을</div>
-            </div>
-        </div>
-        
-        <div class="news-row">
-            <div class="news-num">45</div>
-            <div class="news-body">
-                <div class="news-title">
-                    <a href="https://www.joongboo.com/news/articleView.html?idxno=363736364" target="_blank" rel="noopener">[금주의 파주시] '2026 헤이리 판 페스티벌' 연다… 문화예술과 로컬푸...</a>
-                </div>
-                <div class="news-summary">[금주의 파주시] '2026 헤이리 판 페스티벌' 연다… 문화예술과 로컬푸...</div>
-                <div class="news-tag">#헤이리마을</div>
-            </div>
-        </div>
-        
-    <div class="footer">총 45건 | 매일 아침 자동 업데이트</div>
+    </div>
+
+    <div class="footer">댓글순 20건 · 지역뉴스 20건 | 매일 아침 자동 업데이트</div>
   </div>
+
+  <script>
+    function showTab(name, btn) {
+      document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      btn.classList.add('active');
+    }
+  </script>
 </body>
 </html>
