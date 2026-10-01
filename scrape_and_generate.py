@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 파주 지역 뉴스 스크랩 스크립트 (GitHub Actions용)
-- 네이버 검색 API로 파주 관련 뉴스를 수집
+- 네이버 뉴스 검색 API로 파주 관련 뉴스를 수집
+- 네이버 검색광고 API로 "파주" 연관검색어 + 검색량을 조회해, 검색량 높은 연관검색어를
+  그날의 뉴스 검색 키워드에 자동으로 추가
 - 탭 3개:
   1) 댓글순: 네이버 뉴스(n.news.naver.com) 링크 중 댓글 많은 순
   2) 최신순: 제목에 지역 키워드가 직접 포함된(연관성 엄격) 기사 중 발행시각 최신순
@@ -15,12 +17,15 @@
 import os
 import re
 import json
+import time
+import hashlib
+import hmac
+import base64
 import requests
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
 from bs4 import BeautifulSoup
-import time
 from google import genai
 
 # ============================================
@@ -31,9 +36,14 @@ CLIENT_ID = os.environ["NAVER_CLIENT_ID"]
 CLIENT_SECRET = os.environ["NAVER_CLIENT_SECRET"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
+# 네이버 검색광고 API (연관검색어 자동 추출용) — 없으면 이 기능만 건너뜀
+AD_API_KEY = os.environ.get("NAVER_AD_API_KEY", "")
+AD_SECRET_KEY = os.environ.get("NAVER_AD_SECRET_KEY", "")
+AD_CUSTOMER_ID = os.environ.get("NAVER_AD_CUSTOMER_ID", "")
+
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-KEYWORDS = [
+BASE_KEYWORDS = [
     "파주 맛집",
     "파주 사건",
     "파주 축제",
@@ -47,11 +57,102 @@ KEYWORDS = [
     "헤이리마을",
 ]
 
+# 연관검색어 자동 추출용 "씨앗" 키워드
+SEED_KEYWORDS = ["파주", "운정", "야당동", "금촌", "문산"]
+
+# 연관검색어가 이 검색량(월간 PC+모바일 합계) 이상이면 자동으로 키워드에 추가
+RELATED_KEYWORD_MIN_VOLUME = 300
+# 자동 추가하는 연관검색어 최대 개수
+RELATED_KEYWORD_MAX_COUNT = 5
+
 NEWS_PER_KEYWORD = 8      # 키워드당 넉넉히 수집
 TOP_N = 20                # 탭별 최종 표시 개수
 LOCAL_KEYWORDS = ["파주", "야당동", "야당역", "헤이리", "운정", "금촌", "문산", "교하"]
 
 KST = timezone(timedelta(hours=9))
+
+# ============================================
+# 네이버 검색광고 API: 연관검색어 + 검색량 조회
+# ============================================
+
+def get_ad_api_headers(method, uri):
+    timestamp = str(round(time.time() * 1000))
+    message = f"{timestamp}.{method}.{uri}"
+    signature = base64.b64encode(
+        hmac.new(AD_SECRET_KEY.encode(), message.encode(), hashlib.sha256).digest()
+    ).decode()
+    return {
+        "X-Timestamp": timestamp,
+        "X-API-KEY": AD_API_KEY,
+        "X-Customer": AD_CUSTOMER_ID,
+        "X-Signature": signature,
+    }
+
+def fetch_related_keywords(seed_keywords):
+    """
+    네이버 검색광고 API(키워드도구)로 연관검색어 + 월간 검색량을 조회.
+    키가 설정 안 돼 있으면 빈 리스트 반환 (이 기능만 조용히 비활성화).
+    """
+    if not (AD_API_KEY and AD_SECRET_KEY and AD_CUSTOMER_ID):
+        print("  (네이버 검색광고 API 키가 없어 연관검색어 추출을 건너뜁니다)")
+        return []
+
+    uri = "/keywordstool"
+    url = "https://api.naver.com" + uri
+    params = {
+        "hintKeywords": ",".join(seed_keywords),
+        "showDetail": "1",
+    }
+    try:
+        headers = get_ad_api_headers("GET", uri)
+        res = requests.get(url, params=params, headers=headers, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+    except Exception as e:
+        print(f"  연관검색어 API 오류: {e}")
+        return []
+
+    results = []
+    for item in data.get("keywordList", []):
+        rel_keyword = item.get("relKeyword", "")
+        pc = item.get("monthlyPcQcCnt", 0)
+        mobile = item.get("monthlyMobileQcCnt", 0)
+
+        # "< 10" 같은 문자열로 오는 경우 처리
+        def to_num(v):
+            if isinstance(v, str):
+                return 0 if "<" in v else int(re.sub(r'[^0-9]', '', v) or 0)
+            return int(v or 0)
+
+        total_volume = to_num(pc) + to_num(mobile)
+
+        # 지역과 무관한 연관검색어는 제외
+        if not any(kw in rel_keyword for kw in LOCAL_KEYWORDS):
+            continue
+
+        results.append({"keyword": rel_keyword, "volume": total_volume})
+
+    results.sort(key=lambda x: x["volume"], reverse=True)
+    return results
+
+def build_dynamic_keywords():
+    """
+    BASE_KEYWORDS + 검색량 높은 연관검색어를 합쳐서
+    오늘 사용할 전체 키워드 리스트와, 새로 추가된 연관검색어 목록을 반환.
+    """
+    related = fetch_related_keywords(SEED_KEYWORDS)
+    picked = []
+    for item in related:
+        if item["volume"] < RELATED_KEYWORD_MIN_VOLUME:
+            continue
+        if item["keyword"] in BASE_KEYWORDS:
+            continue
+        picked.append(item)
+        if len(picked) >= RELATED_KEYWORD_MAX_COUNT:
+            break
+
+    all_keywords = BASE_KEYWORDS + [p["keyword"] for p in picked]
+    return all_keywords, picked
 
 # ============================================
 # 뉴스 검색 및 유틸 함수
@@ -77,7 +178,6 @@ def clean_html_tags(text):
     return unescape(clean)
 
 def parse_pubdate(pubdate_str):
-    """네이버 API의 pubDate(RFC822 형식)를 KST datetime으로 변환"""
     try:
         dt = parsedate_to_datetime(pubdate_str)
         if dt.tzinfo is None:
@@ -128,12 +228,10 @@ def get_comment_count(oid, aid, url):
         return 0
 
 def is_local_news(title, desc):
-    """일반 필터: 제목 또는 설명에 지역 키워드가 있으면 통과"""
     text = title + " " + desc
     return any(kw in text for kw in LOCAL_KEYWORDS)
 
 def is_title_relevant(title):
-    """엄격한 필터(최신순 탭 전용): 제목에 직접 지역 키워드가 있어야 통과"""
     return any(kw in title for kw in LOCAL_KEYWORDS)
 
 def is_similar_title(new_title, seen_titles):
@@ -176,13 +274,13 @@ def summarize_with_gemini(title, content):
 # 뉴스 수집
 # ============================================
 
-def collect_all_news():
+def collect_all_news(keywords):
     all_news = []
     seen_links = set()
     seen_titles = []
 
     print("뉴스 수집 중...")
-    for keyword in KEYWORDS:
+    for keyword in keywords:
         print(f"  '{keyword}' 검색 중...")
         result = search_news(keyword, NEWS_PER_KEYWORD * 3)
 
@@ -229,24 +327,21 @@ def collect_all_news():
                 count += 1
                 time.sleep(0.3)
 
-    # 탭1: 댓글순 (네이버 뉴스만, 댓글 많은 순)
     comment_group = [n for n in all_news if n["is_naver"]]
     comment_group.sort(key=lambda x: x["comment_count"], reverse=True)
 
-    # 탭2: 최신순 (제목에 지역 키워드 직접 포함 + 발행시각 최신순, 댓글 수 무관)
     latest_group = [n for n in all_news if n["title_relevant"]]
     latest_group.sort(
         key=lambda x: x["pub_dt"] if x["pub_dt"] else datetime.min.replace(tzinfo=KST),
         reverse=True
     )
 
-    # 탭3: 지역뉴스 연관도순 (네이버 아닌 링크, 검색 연관도순 유지)
     local_group = [n for n in all_news if not n["is_naver"]]
 
     return comment_group[:TOP_N], latest_group[:TOP_N], local_group[:TOP_N]
 
 # ============================================
-# 게시판 스타일 전체 HTML 페이지 생성 (탭 3개)
+# 게시판 스타일 전체 HTML 페이지 생성
 # ============================================
 
 def render_rows(news_list, show_comment_badge):
@@ -281,13 +376,28 @@ def render_rows(news_list, show_comment_badge):
         """
     return rows
 
-def generate_full_page(comment_news, latest_news, local_news):
+def render_trending_section(picked_related):
+    if not picked_related:
+        return ""
+    chips = "".join(
+        f'<span class="trend-chip">{p["keyword"]} <b>{p["volume"]:,}</b></span>'
+        for p in picked_related
+    )
+    return f"""
+    <div class="trending-box">
+        <div class="trending-title">🔥 오늘의 인기 연관검색어 (월간 검색량 기준)</div>
+        <div class="trending-chips">{chips}</div>
+    </div>
+    """
+
+def generate_full_page(comment_news, latest_news, local_news, picked_related):
     now = datetime.now(KST)
     updated_str = now.strftime("%Y-%m-%d (%a) %H:%M 업데이트")
 
     comment_rows = render_rows(comment_news, show_comment_badge=True)
     latest_rows = render_rows(latest_news, show_comment_badge=False)
     local_rows = render_rows(local_news, show_comment_badge=False)
+    trending_section = render_trending_section(picked_related)
 
     html = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -325,6 +435,33 @@ def generate_full_page(comment_news, latest_news, local_news):
     margin: 0 auto;
     background: #fff;
     min-height: 100vh;
+  }}
+  .trending-box {{
+    padding: 14px 20px;
+    background: #FFF7ED;
+    border-bottom: 1px solid #eee;
+  }}
+  .trending-title {{
+    font-size: 12px;
+    color: #C2410C;
+    font-weight: bold;
+    margin-bottom: 8px;
+  }}
+  .trending-chips {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }}
+  .trend-chip {{
+    font-size: 12px;
+    background: #fff;
+    border: 1px solid #FDBA74;
+    color: #9A3412;
+    padding: 4px 10px;
+    border-radius: 14px;
+  }}
+  .trend-chip b {{
+    color: #EB6248;
   }}
   .tab-bar {{
     display: flex;
@@ -427,6 +564,8 @@ def generate_full_page(comment_news, latest_news, local_news):
       <div class="updated">{updated_str}</div>
     </div>
 
+    {trending_section}
+
     <div class="tab-bar">
       <button class="tab-btn active" onclick="showTab('comment', this)">💬 댓글순</button>
       <button class="tab-btn" onclick="showTab('latest', this)">🕐 최신순</button>
@@ -468,8 +607,13 @@ def generate_full_page(comment_news, latest_news, local_news):
 # ============================================
 
 def main():
-    comment_news, latest_news, local_news = collect_all_news()
-    html_output = generate_full_page(comment_news, latest_news, local_news)
+    keywords, picked_related = build_dynamic_keywords()
+    print(f"오늘 사용할 키워드 ({len(keywords)}개): {keywords}")
+    if picked_related:
+        print(f"자동 추가된 연관검색어: {[(p['keyword'], p['volume']) for p in picked_related]}")
+
+    comment_news, latest_news, local_news = collect_all_news(keywords)
+    html_output = generate_full_page(comment_news, latest_news, local_news, picked_related)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_output)
     print(f"\n완료: index.html 생성 (댓글순 {len(comment_news)}건 / 최신순 {len(latest_news)}건 / 지역뉴스 {len(local_news)}건)")
