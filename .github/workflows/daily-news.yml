@@ -2,8 +2,10 @@ name: 파주 뉴스 매일 업데이트
 
 on:
   schedule:
-    # UTC 기준 22:00 = 한국시간(KST) 오전 7:00
-    - cron: "0 22 * * *"
+    # UTC 22:05 = 한국시간(KST) 오전 7:05 (1차 — GitHub 지연 감안해 5분 당김)
+    - cron: "5 22 * * *"
+    # UTC 04:05 = 한국시간(KST) 오후 1:05 (2차 — 1차가 스킵/지연될 경우 보완용)
+    - cron: "5 4 * * *"
   workflow_dispatch:  # 수동 실행 버튼도 사용 가능
 
 permissions:
