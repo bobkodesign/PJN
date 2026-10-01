@@ -3,10 +3,13 @@
 """
 파주 지역 뉴스 스크랩 스크립트 (GitHub Actions용)
 - 네이버 검색 API로 파주 관련 뉴스를 수집
-- 네이버 뉴스(n.news.naver.com) 링크: 댓글 수 조회 가능 → "댓글순" 탭
-- 그 외 지역 언론사 자체 링크: 댓글 수 조회 불가 → "연관도순" 탭
+- 탭 3개:
+  1) 댓글순: 네이버 뉴스(n.news.naver.com) 링크 중 댓글 많은 순
+  2) 최신순: 제목에 지역 키워드가 직접 포함된(연관성 엄격) 기사 중 발행시각 최신순
+  3) 지역뉴스 연관도순: 그 외 지역 언론사 자체 링크, 검색 연관도순
+- 각 기사에 발행 시각 표시
 - Gemini로 한 줄 요약
-- 결과를 index.html(탭 2개짜리 게시판 스타일 페이지)로 저장
+- 결과를 index.html로 저장
 """
 
 import os
@@ -14,6 +17,7 @@ import re
 import json
 import requests
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from html import unescape
 from bs4 import BeautifulSoup
 import time
@@ -43,7 +47,7 @@ KEYWORDS = [
     "헤이리마을",
 ]
 
-NEWS_PER_KEYWORD = 8      # 키워드당 넉넉히 수집 (최종 정렬 후 추릴 것)
+NEWS_PER_KEYWORD = 8      # 키워드당 넉넉히 수집
 TOP_N = 20                # 탭별 최종 표시 개수
 LOCAL_KEYWORDS = ["파주", "야당동", "야당역", "헤이리", "운정", "금촌", "문산", "교하"]
 
@@ -72,6 +76,16 @@ def clean_html_tags(text):
     clean = re.sub(r'<[^>]+>', '', text)
     return unescape(clean)
 
+def parse_pubdate(pubdate_str):
+    """네이버 API의 pubDate(RFC822 형식)를 KST datetime으로 변환"""
+    try:
+        dt = parsedate_to_datetime(pubdate_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=KST)
+        return dt.astimezone(KST)
+    except Exception:
+        return None
+
 def get_full_content(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -89,7 +103,6 @@ def get_full_content(url):
     return ""
 
 def get_naver_ids(url):
-    """네이버 뉴스 링크면 (oid, aid)를 반환, 아니면 None"""
     match = re.search(r'/article/(\d+)/(\d+)', url)
     if match:
         return match.group(1), match.group(2)
@@ -115,8 +128,13 @@ def get_comment_count(oid, aid, url):
         return 0
 
 def is_local_news(title, desc):
+    """일반 필터: 제목 또는 설명에 지역 키워드가 있으면 통과"""
     text = title + " " + desc
     return any(kw in text for kw in LOCAL_KEYWORDS)
+
+def is_title_relevant(title):
+    """엄격한 필터(최신순 탭 전용): 제목에 직접 지역 키워드가 있어야 통과"""
+    return any(kw in title for kw in LOCAL_KEYWORDS)
 
 def is_similar_title(new_title, seen_titles):
     new_keywords = set(re.findall(r'[가-힣a-zA-Z0-9]+', new_title))
@@ -186,6 +204,7 @@ def collect_all_news():
 
                 content = get_full_content(item["link"]) or api_desc
                 summary = summarize_with_gemini(api_title, content)
+                pub_dt = parse_pubdate(item.get("pubDate", ""))
 
                 naver_ids = get_naver_ids(item["link"])
                 is_naver = naver_ids is not None
@@ -201,6 +220,8 @@ def collect_all_news():
                     "keyword": keyword,
                     "is_naver": is_naver,
                     "comment_count": comment_count,
+                    "pub_dt": pub_dt,
+                    "title_relevant": is_title_relevant(api_title),
                 })
 
                 seen_links.add(item["link"])
@@ -208,19 +229,24 @@ def collect_all_news():
                 count += 1
                 time.sleep(0.3)
 
-    # 네이버 뉴스(댓글 조회 가능) / 지역 언론사 자체 링크(연관도순 유지)로 분리
+    # 탭1: 댓글순 (네이버 뉴스만, 댓글 많은 순)
     comment_group = [n for n in all_news if n["is_naver"]]
-    local_group = [n for n in all_news if not n["is_naver"]]
-
-    # 댓글순 탭: 댓글 많은 순
     comment_group.sort(key=lambda x: x["comment_count"], reverse=True)
 
-    # 연관도순 탭: 수집된 순서(=검색 API의 연관도순, sort=sim) 그대로 유지
+    # 탭2: 최신순 (제목에 지역 키워드 직접 포함 + 발행시각 최신순, 댓글 수 무관)
+    latest_group = [n for n in all_news if n["title_relevant"]]
+    latest_group.sort(
+        key=lambda x: x["pub_dt"] if x["pub_dt"] else datetime.min.replace(tzinfo=KST),
+        reverse=True
+    )
 
-    return comment_group[:TOP_N], local_group[:TOP_N]
+    # 탭3: 지역뉴스 연관도순 (네이버 아닌 링크, 검색 연관도순 유지)
+    local_group = [n for n in all_news if not n["is_naver"]]
+
+    return comment_group[:TOP_N], latest_group[:TOP_N], local_group[:TOP_N]
 
 # ============================================
-# 게시판 스타일 전체 HTML 페이지 생성 (탭 2개)
+# 게시판 스타일 전체 HTML 페이지 생성 (탭 3개)
 # ============================================
 
 def render_rows(news_list, show_comment_badge):
@@ -230,8 +256,13 @@ def render_rows(news_list, show_comment_badge):
     rows = ""
     for i, news in enumerate(news_list, 1):
         badge = ""
-        if show_comment_badge:
+        if show_comment_badge and news["comment_count"] > 0:
             badge = f'<span class="comment-badge">💬 댓글 {news["comment_count"]}개</span>'
+
+        pub_str = ""
+        if news["pub_dt"]:
+            pub_str = f'<span class="pub-time">🕐 {news["pub_dt"].strftime("%m-%d %H:%M")}</span>'
+
         rows += f"""
         <div class="news-row">
             <div class="news-num">{i}</div>
@@ -243,23 +274,28 @@ def render_rows(news_list, show_comment_badge):
                 <div class="news-meta">
                     <span class="news-tag">#{news['keyword'].replace(' ', '')}</span>
                     {badge}
+                    {pub_str}
                 </div>
             </div>
         </div>
         """
     return rows
 
-def generate_full_page(comment_news, local_news):
+def generate_full_page(comment_news, latest_news, local_news):
     now = datetime.now(KST)
     updated_str = now.strftime("%Y-%m-%d (%a) %H:%M 업데이트")
 
     comment_rows = render_rows(comment_news, show_comment_badge=True)
+    latest_rows = render_rows(latest_news, show_comment_badge=False)
     local_rows = render_rows(local_news, show_comment_badge=False)
 
     html = f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>파주 핫이슈 게시판</title>
 <style>
@@ -302,7 +338,7 @@ def generate_full_page(comment_news, local_news):
     flex: 1;
     padding: 14px 0;
     text-align: center;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     color: #999;
     background: none;
@@ -357,6 +393,7 @@ def generate_full_page(comment_news, local_news):
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
   }}
   .news-tag {{
     display: inline-block;
@@ -366,7 +403,7 @@ def generate_full_page(comment_news, local_news):
     padding: 2px 8px;
     border-radius: 10px;
   }}
-  .comment-badge {{
+  .comment-badge, .pub-time {{
     font-size: 11px;
     color: #888;
   }}
@@ -392,7 +429,8 @@ def generate_full_page(comment_news, local_news):
 
     <div class="tab-bar">
       <button class="tab-btn active" onclick="showTab('comment', this)">💬 댓글순</button>
-      <button class="tab-btn" onclick="showTab('local', this)">📍 지역뉴스 연관도순</button>
+      <button class="tab-btn" onclick="showTab('latest', this)">🕐 최신순</button>
+      <button class="tab-btn" onclick="showTab('local', this)">📍 지역뉴스</button>
     </div>
 
     <div id="tab-comment" class="tab-panel active">
@@ -400,12 +438,17 @@ def generate_full_page(comment_news, local_news):
       {comment_rows}
     </div>
 
+    <div id="tab-latest" class="tab-panel">
+      <div class="tab-desc">제목에 지역명이 직접 포함된 기사만 · 발행 시각 최신순 (댓글수 무관)</div>
+      {latest_rows}
+    </div>
+
     <div id="tab-local" class="tab-panel">
       <div class="tab-desc">지역 언론사 자체 기사 · 검색 연관도 높은 순</div>
       {local_rows}
     </div>
 
-    <div class="footer">댓글순 {len(comment_news)}건 · 지역뉴스 {len(local_news)}건 | 매일 아침 자동 업데이트</div>
+    <div class="footer">댓글순 {len(comment_news)}건 · 최신순 {len(latest_news)}건 · 지역뉴스 {len(local_news)}건 | 매일 아침 자동 업데이트</div>
   </div>
 
   <script>
@@ -425,11 +468,11 @@ def generate_full_page(comment_news, local_news):
 # ============================================
 
 def main():
-    comment_news, local_news = collect_all_news()
-    html_output = generate_full_page(comment_news, local_news)
+    comment_news, latest_news, local_news = collect_all_news()
+    html_output = generate_full_page(comment_news, latest_news, local_news)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_output)
-    print(f"\n완료: index.html 생성 (댓글순 {len(comment_news)}건 / 지역뉴스 {len(local_news)}건)")
+    print(f"\n완료: index.html 생성 (댓글순 {len(comment_news)}건 / 최신순 {len(latest_news)}건 / 지역뉴스 {len(local_news)}건)")
 
 if __name__ == "__main__":
     main()
