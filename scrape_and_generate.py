@@ -3,8 +3,8 @@
 """
 파주 지역 뉴스 스크랩 스크립트 (GitHub Actions용)
 - 네이버 뉴스 검색 API로 파주 관련 뉴스를 수집
-- 네이버 검색광고 API로 "파주" 연관검색어 + 검색량을 조회해, 검색량 높은 연관검색어를
-  그날의 뉴스 검색 키워드에 자동으로 추가
+- 오늘 수집된 기사 제목들을 직접 분석해서, 여러 기사에서 반복 등장하는 키워드를
+  "오늘 많이 언급된 이슈"로 뽑아 보여줌 (예: 파주 임진각, 문산 살인 등)
 - 탭 3개:
   1) 댓글순: 네이버 뉴스(n.news.naver.com) 링크 중 댓글 많은 순
   2) 최신순: 제목에 지역 키워드가 직접 포함된(연관성 엄격) 기사 중 발행시각 최신순
@@ -18,10 +18,8 @@ import os
 import re
 import json
 import time
-import hashlib
-import hmac
-import base64
 import requests
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
@@ -36,14 +34,9 @@ CLIENT_ID = os.environ["NAVER_CLIENT_ID"]
 CLIENT_SECRET = os.environ["NAVER_CLIENT_SECRET"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-# 네이버 검색광고 API (연관검색어 자동 추출용) — 없으면 이 기능만 건너뜀
-AD_API_KEY = os.environ.get("NAVER_AD_API_KEY", "")
-AD_SECRET_KEY = os.environ.get("NAVER_AD_SECRET_KEY", "")
-AD_CUSTOMER_ID = os.environ.get("NAVER_AD_CUSTOMER_ID", "")
-
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-BASE_KEYWORDS = [
+KEYWORDS = [
     "파주 맛집",
     "파주 사건",
     "파주 축제",
@@ -57,102 +50,20 @@ BASE_KEYWORDS = [
     "헤이리마을",
 ]
 
-# 연관검색어 자동 추출용 "씨앗" 키워드
-SEED_KEYWORDS = ["파주", "운정", "야당동", "금촌", "문산"]
-
-# 연관검색어가 이 검색량(월간 PC+모바일 합계) 이상이면 자동으로 키워드에 추가
-RELATED_KEYWORD_MIN_VOLUME = 300
-# 자동 추가하는 연관검색어 최대 개수
-RELATED_KEYWORD_MAX_COUNT = 5
-
 NEWS_PER_KEYWORD = 8      # 키워드당 넉넉히 수집
 TOP_N = 20                # 탭별 최종 표시 개수
 LOCAL_KEYWORDS = ["파주", "야당동", "야당역", "헤이리", "운정", "금촌", "문산", "교하"]
 
+# "오늘 많이 언급된 이슈" 추출 설정
+TREND_TOP_N = 5           # 최대 표시 개수
+TREND_MIN_COUNT = 2       # 최소 몇 건의 기사에서 반복돼야 뽑을지
+TREND_STOPWORDS = {
+    "있다", "없다", "한다", "됐다", "된다", "됩니다", "위해", "관련", "전망",
+    "이번", "오늘", "내일", "올해", "최근", "대한", "기자", "사진", "종합",
+    "단독", "속보", "영상", "오전", "오후", "지역", "소식", "뉴스", "진행",
+}
+
 KST = timezone(timedelta(hours=9))
-
-# ============================================
-# 네이버 검색광고 API: 연관검색어 + 검색량 조회
-# ============================================
-
-def get_ad_api_headers(method, uri):
-    timestamp = str(round(time.time() * 1000))
-    message = f"{timestamp}.{method}.{uri}"
-    signature = base64.b64encode(
-        hmac.new(AD_SECRET_KEY.encode(), message.encode(), hashlib.sha256).digest()
-    ).decode()
-    return {
-        "X-Timestamp": timestamp,
-        "X-API-KEY": AD_API_KEY,
-        "X-Customer": AD_CUSTOMER_ID,
-        "X-Signature": signature,
-    }
-
-def fetch_related_keywords(seed_keywords):
-    """
-    네이버 검색광고 API(키워드도구)로 연관검색어 + 월간 검색량을 조회.
-    키가 설정 안 돼 있으면 빈 리스트 반환 (이 기능만 조용히 비활성화).
-    """
-    if not (AD_API_KEY and AD_SECRET_KEY and AD_CUSTOMER_ID):
-        print("  (네이버 검색광고 API 키가 없어 연관검색어 추출을 건너뜁니다)")
-        return []
-
-    uri = "/keywordstool"
-    url = "https://api.naver.com" + uri
-    params = {
-        "hintKeywords": ",".join(seed_keywords),
-        "showDetail": "1",
-    }
-    try:
-        headers = get_ad_api_headers("GET", uri)
-        res = requests.get(url, params=params, headers=headers, timeout=10)
-        res.raise_for_status()
-        data = res.json()
-    except Exception as e:
-        print(f"  연관검색어 API 오류: {e}")
-        return []
-
-    results = []
-    for item in data.get("keywordList", []):
-        rel_keyword = item.get("relKeyword", "")
-        pc = item.get("monthlyPcQcCnt", 0)
-        mobile = item.get("monthlyMobileQcCnt", 0)
-
-        # "< 10" 같은 문자열로 오는 경우 처리
-        def to_num(v):
-            if isinstance(v, str):
-                return 0 if "<" in v else int(re.sub(r'[^0-9]', '', v) or 0)
-            return int(v or 0)
-
-        total_volume = to_num(pc) + to_num(mobile)
-
-        # 지역과 무관한 연관검색어는 제외
-        if not any(kw in rel_keyword for kw in LOCAL_KEYWORDS):
-            continue
-
-        results.append({"keyword": rel_keyword, "volume": total_volume})
-
-    results.sort(key=lambda x: x["volume"], reverse=True)
-    return results
-
-def build_dynamic_keywords():
-    """
-    BASE_KEYWORDS + 검색량 높은 연관검색어를 합쳐서
-    오늘 사용할 전체 키워드 리스트와, 새로 추가된 연관검색어 목록을 반환.
-    """
-    related = fetch_related_keywords(SEED_KEYWORDS)
-    picked = []
-    for item in related:
-        if item["volume"] < RELATED_KEYWORD_MIN_VOLUME:
-            continue
-        if item["keyword"] in BASE_KEYWORDS:
-            continue
-        picked.append(item)
-        if len(picked) >= RELATED_KEYWORD_MAX_COUNT:
-            break
-
-    all_keywords = BASE_KEYWORDS + [p["keyword"] for p in picked]
-    return all_keywords, picked
 
 # ============================================
 # 뉴스 검색 및 유틸 함수
@@ -271,16 +182,56 @@ def summarize_with_gemini(title, content):
         return title
 
 # ============================================
+# "오늘 많이 언급된 이슈" 추출 (기사 제목 직접 분석)
+# ============================================
+
+def extract_trending_phrases(all_news):
+    """
+    오늘 수집된 모든 기사 제목에서, 지역 키워드를 제외한 단어들의
+    등장 빈도를 세어 여러 기사에서 반복되는 핵심 단어를 찾는다.
+    해당 단어가 가장 자주 함께 등장한 지역명과 묶어서
+    "파주 임진각", "문산 살인" 같은 조합으로 보여준다.
+    """
+    word_doc_count = Counter()
+    word_location = defaultdict(Counter)
+
+    for news in all_news:
+        title = news["title"]
+        tokens = set(re.findall(r'[가-힣]{2,}', title))
+        loc_found = next((kw for kw in LOCAL_KEYWORDS if kw in title), None)
+
+        for tok in tokens:
+            if tok in LOCAL_KEYWORDS or tok in TREND_STOPWORDS:
+                continue
+            word_doc_count[tok] += 1
+            if loc_found:
+                word_location[tok][loc_found] += 1
+
+    phrases = []
+    for word, count in word_doc_count.most_common(30):
+        if count < TREND_MIN_COUNT:
+            break
+        loc = None
+        if word_location[word]:
+            loc = word_location[word].most_common(1)[0][0]
+        phrase = f"{loc} {word}" if loc and loc not in word else word
+        phrases.append({"phrase": phrase, "count": count})
+        if len(phrases) >= TREND_TOP_N:
+            break
+
+    return phrases
+
+# ============================================
 # 뉴스 수집
 # ============================================
 
-def collect_all_news(keywords):
+def collect_all_news():
     all_news = []
     seen_links = set()
     seen_titles = []
 
     print("뉴스 수집 중...")
-    for keyword in keywords:
+    for keyword in KEYWORDS:
         print(f"  '{keyword}' 검색 중...")
         result = search_news(keyword, NEWS_PER_KEYWORD * 3)
 
@@ -338,7 +289,9 @@ def collect_all_news(keywords):
 
     local_group = [n for n in all_news if not n["is_naver"]]
 
-    return comment_group[:TOP_N], latest_group[:TOP_N], local_group[:TOP_N]
+    trending = extract_trending_phrases(all_news)
+
+    return comment_group[:TOP_N], latest_group[:TOP_N], local_group[:TOP_N], trending
 
 # ============================================
 # 게시판 스타일 전체 HTML 페이지 생성
@@ -376,28 +329,28 @@ def render_rows(news_list, show_comment_badge):
         """
     return rows
 
-def render_trending_section(picked_related):
-    if not picked_related:
+def render_trending_section(trending):
+    if not trending:
         return ""
     chips = "".join(
-        f'<span class="trend-chip">{p["keyword"]} <b>{p["volume"]:,}</b></span>'
-        for p in picked_related
+        f'<span class="trend-chip">{t["phrase"]} <b>{t["count"]}건</b></span>'
+        for t in trending
     )
     return f"""
     <div class="trending-box">
-        <div class="trending-title">🔥 오늘의 인기 연관검색어 (월간 검색량 기준)</div>
+        <div class="trending-title">🔥 오늘 많이 언급된 이슈 (오늘 수집된 기사 기준)</div>
         <div class="trending-chips">{chips}</div>
     </div>
     """
 
-def generate_full_page(comment_news, latest_news, local_news, picked_related):
+def generate_full_page(comment_news, latest_news, local_news, trending):
     now = datetime.now(KST)
     updated_str = now.strftime("%Y-%m-%d (%a) %H:%M 업데이트")
 
     comment_rows = render_rows(comment_news, show_comment_badge=True)
     latest_rows = render_rows(latest_news, show_comment_badge=False)
     local_rows = render_rows(local_news, show_comment_badge=False)
-    trending_section = render_trending_section(picked_related)
+    trending_section = render_trending_section(trending)
 
     html = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -607,13 +560,11 @@ def generate_full_page(comment_news, latest_news, local_news, picked_related):
 # ============================================
 
 def main():
-    keywords, picked_related = build_dynamic_keywords()
-    print(f"오늘 사용할 키워드 ({len(keywords)}개): {keywords}")
-    if picked_related:
-        print(f"자동 추가된 연관검색어: {[(p['keyword'], p['volume']) for p in picked_related]}")
+    comment_news, latest_news, local_news, trending = collect_all_news()
+    if trending:
+        print(f"오늘 많이 언급된 이슈: {[(t['phrase'], t['count']) for t in trending]}")
 
-    comment_news, latest_news, local_news = collect_all_news(keywords)
-    html_output = generate_full_page(comment_news, latest_news, local_news, picked_related)
+    html_output = generate_full_page(comment_news, latest_news, local_news, trending)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_output)
     print(f"\n완료: index.html 생성 (댓글순 {len(comment_news)}건 / 최신순 {len(latest_news)}건 / 지역뉴스 {len(local_news)}건)")
